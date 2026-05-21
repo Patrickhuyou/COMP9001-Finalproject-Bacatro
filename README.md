@@ -33,6 +33,7 @@ python3 main.py
 
 - `Enter`: start a new run
 - `L`: open load page
+- `R`: open rules page
 - `Esc`: quit
 
 ### In Game
@@ -54,11 +55,18 @@ python3 main.py
 - `R`: start a new run
 - `H`: return to home page
 
+### Rules Page
+
+- Mouse wheel / `Up` / `Down`: scroll rules
+- `Enter`: start a new run
+- `Esc` / `Backspace`: return to home page
+
 ## Main Features
 
 - Standard Baccarat dealing and third-card rules
 - Player, Banker, Tie, Player Pair, and Banker Pair bets
 - Live payout panel for Player, Banker, Tie, and Pair odds
+- In-game rules page explaining Baccarat basics and evolution cards
 - Six-level roguelike structure
 - Shrinking bet limits at higher levels
 - Common, Rare, and Epic evolution cards

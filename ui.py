@@ -14,7 +14,7 @@ except ModuleNotFoundError as exc:
 
 from cards import Card, Hand, SUIT_SYMBOLS
 from game_state import MAX_LEVEL, GameState, clamp
-from items import Item
+from items import ITEM_POOL, Item
 from storage import DEFAULT_STORAGE, SAVE_SLOT_COUNT
 
 
@@ -89,6 +89,8 @@ class BacatroApp:
         self.running = True
         self.buttons: List[Button] = []
         self.menu_return_state = "home"
+        self.rules_scroll = 0
+        self.rules_scroll_max = 0
         self.screen_state = ""
         self.set_screen_state("home")
 
@@ -109,6 +111,8 @@ class BacatroApp:
             self.build_load_buttons()
         elif self.screen_state == "save_game":
             self.build_save_buttons()
+        elif self.screen_state == "rules":
+            self.build_rules_buttons()
         else:
             self.buttons = []
 
@@ -143,6 +147,13 @@ class BacatroApp:
     def open_save_screen(self) -> None:
         self.menu_return_state = "playing"
         self.set_screen_state("save_game")
+
+    def open_rules_screen(self) -> None:
+        self.rules_scroll = 0
+        self.set_screen_state("rules")
+
+    def scroll_rules(self, amount: int) -> None:
+        self.rules_scroll = clamp(self.rules_scroll + amount, 0, self.rules_scroll_max)
 
     def return_from_slot_screen(self) -> None:
         self.set_screen_state(self.menu_return_state)
@@ -312,9 +323,16 @@ class BacatroApp:
 
     def build_home_buttons(self) -> None:
         self.buttons = [
-            Button(pygame.Rect(430, 390, 240, 50), "Start Game", self.start_new_run),
-            Button(pygame.Rect(430, 454, 240, 50), "Load Game", lambda: self.open_load_screen("home")),
-            Button(pygame.Rect(430, 518, 240, 50), "Quit", self.quit_game),
+            Button(pygame.Rect(430, 378, 240, 44), "Start Game", self.start_new_run),
+            Button(pygame.Rect(430, 432, 240, 44), "Load Game", lambda: self.open_load_screen("home")),
+            Button(pygame.Rect(430, 486, 240, 44), "Rules", self.open_rules_screen),
+            Button(pygame.Rect(430, 540, 240, 44), "Quit", self.quit_game),
+        ]
+
+    def build_rules_buttons(self) -> None:
+        self.buttons = [
+            Button(pygame.Rect(382, 628, 160, 44), "Back", self.go_home),
+            Button(pygame.Rect(558, 628, 160, 44), "Start Game", self.start_new_run),
         ]
 
     def build_game_over_buttons(self) -> None:
@@ -391,8 +409,25 @@ class BacatroApp:
                 self.start_new_run()
             elif key == pygame.K_l:
                 self.open_load_screen("home")
+            elif key == pygame.K_r:
+                self.open_rules_screen()
             elif key == pygame.K_ESCAPE:
                 self.quit_game()
+            return
+
+        if self.screen_state == "rules":
+            if key in {pygame.K_ESCAPE, pygame.K_h, pygame.K_BACKSPACE}:
+                self.go_home()
+            elif key in {pygame.K_RETURN, pygame.K_SPACE}:
+                self.start_new_run()
+            elif key == pygame.K_DOWN:
+                self.scroll_rules(36)
+            elif key == pygame.K_UP:
+                self.scroll_rules(-36)
+            elif key == pygame.K_PAGEDOWN:
+                self.scroll_rules(180)
+            elif key == pygame.K_PAGEUP:
+                self.scroll_rules(-180)
             return
 
         if self.screen_state == "load_game":
@@ -459,6 +494,21 @@ class BacatroApp:
     def draw_panel(self, rect: pygame.Rect) -> None:
         pygame.draw.rect(self.screen, PANEL, rect, border_radius=8)
         pygame.draw.rect(self.screen, (12, 20, 20), rect, width=2, border_radius=8)
+
+    def draw_wrapped_text(
+        self,
+        text: str,
+        x: int,
+        y: int,
+        font: pygame.font.Font,
+        color: Tuple[int, int, int],
+        max_width: int,
+        line_height: int,
+    ) -> int:
+        for line in wrap_text(text, font, max_width):
+            self.draw_text(line, x, y, font, color)
+            y += line_height
+        return y
 
     def draw_odds_panel(self) -> None:
         rect = pygame.Rect(370, 318, 360, 64)
@@ -575,27 +625,157 @@ class BacatroApp:
         pygame.draw.rect(self.screen, FELT, pygame.Rect(28, 28, 1044, 664), border_radius=18)
         pygame.draw.rect(self.screen, (17, 35, 31), pygame.Rect(28, 28, 1044, 664), width=4, border_radius=18)
 
-        panel = pygame.Rect(330, 92, 440, 500)
+        panel = pygame.Rect(330, 72, 440, 548)
         pygame.draw.rect(self.screen, HOME_PANEL, panel, border_radius=8)
         pygame.draw.rect(self.screen, (12, 20, 20), panel, width=2, border_radius=8)
 
-        self.draw_centered_text("BACATRO", (WIDTH // 2, 160), self.title_font, GOLD)
-        self.draw_centered_text("Baccarat roguelike", (WIDTH // 2, 208), self.font, INK)
+        self.draw_centered_text("BACATRO", (WIDTH // 2, 140), self.title_font, GOLD)
+        self.draw_centered_text("Baccarat roguelike", (WIDTH // 2, 188), self.font, INK)
 
         if self.logo:
-            logo_rect = self.logo.get_rect(center=(WIDTH // 2, 280))
+            logo_rect = self.logo.get_rect(center=(WIDTH // 2, 264))
             self.screen.blit(self.logo, logo_rect)
         else:
-            self.draw_centered_text("BACATRO", (WIDTH // 2, 280), self.big_font, GOLD)
+            self.draw_centered_text("BACATRO", (WIDTH // 2, 264), self.big_font, GOLD)
 
-        self.draw_centered_text("Reach each chip target and evolve your run.", (WIDTH // 2, 356), self.small_font, MUTED)
+        self.draw_centered_text("Reach each chip target and evolve your run.", (WIDTH // 2, 342), self.small_font, MUTED)
         for button in self.buttons:
             button.draw(self.screen, self.font)
 
         if self.game.message != "Choose a side, set your bet, then press Deal.":
             message = self.fit_text(self.game.message, self.small_font, panel.width - 36)
             self.draw_centered_text(message, (WIDTH // 2, 605), self.small_font, INK)
-        self.draw_centered_text("Enter Start   L Load   Esc Quit", (WIDTH // 2, 648), self.small_font, MUTED)
+        self.draw_centered_text("Enter Start   L Load   R Rules   Esc Quit", (WIDTH // 2, 648), self.small_font, MUTED)
+
+    def draw_rules(self) -> None:
+        self.screen.fill(BG)
+        pygame.draw.rect(self.screen, FELT, pygame.Rect(28, 28, 1044, 664), border_radius=18)
+        pygame.draw.rect(self.screen, (17, 35, 31), pygame.Rect(28, 28, 1044, 664), width=4, border_radius=18)
+
+        panel = pygame.Rect(62, 46, 976, 642)
+        pygame.draw.rect(self.screen, HOME_PANEL, panel, border_radius=8)
+        pygame.draw.rect(self.screen, (12, 20, 20), panel, width=2, border_radius=8)
+        self.draw_centered_text("RULES", (WIDTH // 2, 88), self.title_font, GOLD)
+        self.draw_centered_text("Learn the table, then build a run with evolution cards.", (WIDTH // 2, 124), self.small_font, MUTED)
+
+        viewport = pygame.Rect(92, 150, 900, 438)
+        content_frame = viewport.inflate(0, 0)
+        self.draw_panel(content_frame)
+
+        old_clip = self.screen.get_clip()
+        self.screen.set_clip(viewport)
+
+        left_x = viewport.x + 26
+        right_x = viewport.x + 494
+        column_width = 390
+        left_y = viewport.y + 22 - self.rules_scroll
+        right_y = left_y
+
+        self.draw_text("Baccarat Basics", left_x, left_y, self.font, GOLD)
+        left_y += 36
+        basics = [
+            "Player and Banker each receive two cards. The hand closest to 9 wins.",
+            "Only the last digit counts: 15 becomes 5, 20 becomes 0.",
+            "Natural 8 or 9 stops the round immediately.",
+            "A counts as 1. 10, J, Q, and K count as 0.",
+        ]
+        for line in basics:
+            left_y = self.draw_wrapped_text(f"- {line}", left_x + 4, left_y, self.small_font, INK, column_width, 22)
+            left_y += 6
+
+        left_y += 14
+        self.draw_text("Drawing Rules", left_x, left_y, self.font, GOLD)
+        left_y += 36
+        drawing = [
+            "Player draws on 0-5 and stands on 6-7.",
+            "If Player stands, Banker draws on 0-5 and stands on 6-7.",
+            "If Player draws, Banker uses its own total plus Player's third-card value.",
+            "Pair bets only check the first two cards, not any third card.",
+        ]
+        for line in drawing:
+            left_y = self.draw_wrapped_text(f"- {line}", left_x + 4, left_y, self.small_font, INK, column_width, 22)
+            left_y += 6
+
+        left_y += 14
+        self.draw_text("Banker Third-Card Table", left_x, left_y, self.font, GOLD)
+        left_y += 36
+        banker_table = [
+            "Banker 0-2: always draws.",
+            "Banker 3: draws unless Player third card is 8.",
+            "Banker 4: draws if Player third card is 2-7.",
+            "Banker 5: draws if Player third card is 4-7.",
+            "Banker 6: draws if Player third card is 6-7.",
+            "Banker 7: stands.",
+        ]
+        for line in banker_table:
+            left_y = self.draw_wrapped_text(f"- {line}", left_x + 4, left_y, self.small_font, INK, column_width, 22)
+            left_y += 5
+
+        left_y += 14
+        self.draw_text("Bets And Levels", left_x, left_y, self.font, GOLD)
+        left_y += 36
+        bets = [
+            "Player pays 1:1. Banker pays 0.95:1 unless upgraded.",
+            "Tie pays 8:1. Player Pair and Banker Pair pay 11:1.",
+            f"Clear {MAX_LEVEL} levels by reaching each chip target before bets run out.",
+            "Higher levels allow fewer bets, so each decision matters more.",
+        ]
+        for line in bets:
+            left_y = self.draw_wrapped_text(f"- {line}", left_x + 4, left_y, self.small_font, INK, column_width, 22)
+            left_y += 6
+
+        self.draw_text("Evolution Cards", right_x, right_y, self.font, GOLD)
+        right_y += 34
+        right_y = self.draw_wrapped_text(
+            "After clearing a level, choose one of three cards. Common appears most often, Rare is stronger, and Epic is hardest to find.",
+            right_x,
+            right_y,
+            self.small_font,
+            MUTED,
+            column_width,
+            22,
+        )
+        right_y += 18
+
+        rarity_rank = {"Common": 0, "Rare": 1, "Epic": 2}
+        item_classes = sorted(ITEM_POOL, key=lambda item: (rarity_rank[item.rarity], item.name))
+        for item_class in item_classes:
+            color = RARITY_COLORS[item_class.rarity]
+            pygame.draw.circle(self.screen, color, (right_x + 7, right_y + 10), 5)
+            self.draw_text(item_class.name, right_x + 20, right_y, self.small_font, color)
+            self.draw_text(item_class.rarity, right_x + 278, right_y + 2, self.tiny_font, MUTED)
+            right_y += 24
+            right_y = self.draw_wrapped_text(
+                item_class.description,
+                right_x + 20,
+                right_y,
+                self.small_font,
+                INK,
+                column_width - 20,
+                22,
+            )
+            right_y += 16
+
+        self.screen.set_clip(old_clip)
+
+        content_bottom = max(left_y, right_y) + self.rules_scroll + 24
+        self.rules_scroll_max = max(0, content_bottom - viewport.bottom)
+        if self.rules_scroll > self.rules_scroll_max:
+            self.rules_scroll = self.rules_scroll_max
+
+        track = pygame.Rect(viewport.right + 10, viewport.y, 10, viewport.height)
+        pygame.draw.rect(self.screen, (42, 56, 54), track, border_radius=5)
+        if self.rules_scroll_max > 0:
+            thumb_height = max(48, int(track.height * track.height / (track.height + self.rules_scroll_max)))
+            thumb_range = track.height - thumb_height
+            thumb_y = track.y + int(thumb_range * self.rules_scroll / self.rules_scroll_max)
+            pygame.draw.rect(self.screen, GOLD, pygame.Rect(track.x, thumb_y, track.width, thumb_height), border_radius=5)
+        else:
+            pygame.draw.rect(self.screen, GOLD, track, border_radius=5)
+
+        for button in self.buttons:
+            button.draw(self.screen, self.font)
+        self.draw_centered_text("Mouse Wheel / Up / Down Scroll   Esc Home   Enter Start", (WIDTH // 2, 606), self.small_font, MUTED)
 
     def draw_game_over(self) -> None:
         self.screen.fill(BG)
@@ -705,6 +885,11 @@ class BacatroApp:
             pygame.display.flip()
             return
 
+        if self.screen_state == "rules":
+            self.draw_rules()
+            pygame.display.flip()
+            return
+
         if self.screen_state == "game_over":
             self.draw_game_over()
             pygame.display.flip()
@@ -782,6 +967,8 @@ class BacatroApp:
                     self.running = False
                 elif event.type == pygame.KEYDOWN:
                     self.handle_key(event.key)
+                elif event.type == pygame.MOUSEWHEEL and self.screen_state == "rules":
+                    self.scroll_rules(-event.y * 46)
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if self.screen_state == "playing" and self.choose_shop_item(event.pos):
                         continue
