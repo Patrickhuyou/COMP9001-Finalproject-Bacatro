@@ -25,6 +25,8 @@ def clamp(value: int, low: int, high: int) -> int:
 
 @dataclass
 class RoundResult:
+    """Stores everything the UI needs to display after one Baccarat round."""
+
     player: Hand
     banker: Hand
     winner: str
@@ -36,14 +38,21 @@ class RoundResult:
 
 @dataclass
 class GameState:
+    """Holds the complete run state and performs the non-visual game logic."""
+
+    # Core run resources.
     chips: int = 100
     level: int = 1
     target: int = 180
     bet: int = 10
     selected_bet: str = "Player"
+
+    # Objects owned by the run: collected items, rule engine, and card shoe.
     inventory: List[str] = field(default_factory=list)
     rules: BaccaratRules = field(default_factory=BaccaratRules)
     shoe: Shoe = field(default_factory=Shoe)
+
+    # Evolution-card modifiers. Items update these fields through apply().
     no_commission: bool = False
     tie_multiplier: int = 8
     pair_multiplier: int = 11
@@ -76,6 +85,8 @@ class GameState:
         self.bets_remaining = int(self.bets_remaining or 0) + amount
 
     def reset_rule_effects(self) -> None:
+        # Rebuild all item effects from inventory. This is useful after loading
+        # saved data because JSON stores item names, not live Python objects.
         names = list(self.inventory)
         current_bets_remaining = self.bets_remaining
         self.rules = BaccaratRules()
@@ -91,6 +102,7 @@ class GameState:
         self.bets_remaining = current_bets_remaining
 
     def add_item_by_name(self, name: str) -> None:
+        # Find the matching item class, instantiate it, then apply its effect.
         for item_cls in ITEM_POOL:
             if item_cls.name == name:
                 item = item_cls()
@@ -99,6 +111,8 @@ class GameState:
                 return
 
     def offer_items(self) -> None:
+        # Build the three evolution choices shown after clearing a level.
+        # Already-owned items are removed so the player cannot pick duplicates.
         owned = set(self.inventory)
         available = [item_cls for item_cls in ITEM_POOL if item_cls.name not in owned]
         chosen = []
@@ -121,6 +135,7 @@ class GameState:
         return available[-1]
 
     def choose_item(self, index: int) -> None:
+        # The UI passes the clicked/number-key index; GameState owns the effect.
         if 0 <= index < len(self.shop_choices):
             item = self.shop_choices[index]
             self.inventory.append(item.name)
@@ -169,6 +184,7 @@ class GameState:
         return f"Scout Lens: Player looks lively ({player_edge}%)."
 
     def play_round(self) -> RoundResult:
+        # Validate that a round can legally start before spending a bet.
         if self.chips <= 0:
             raise ValueError("You are out of chips.")
         if self.is_game_over:
@@ -178,8 +194,12 @@ class GameState:
         if not self.bets_remaining:
             raise ValueError("No bets remaining this level.")
         self.bet = clamp(self.bet, 1, self.chips)
+
+        # Initial Baccarat deal: two cards to Player and two to Banker.
         player = Hand([self.shoe.draw(), self.shoe.draw()])
         banker = Hand([self.shoe.draw(), self.shoe.draw()])
+
+        # Pair side bets are based only on the opening two cards.
         player_pair = player.has_opening_pair
         banker_pair = banker.has_opening_pair
         narration = [f"Initial totals - Player {player.total}, Banker {banker.total}."]
@@ -211,6 +231,7 @@ class GameState:
         else:
             narration.append("Natural 8 or 9. No third cards.")
 
+        # Compare final totals after any third-card draws.
         if player.total > banker.total:
             winner = "Player"
         elif banker.total > player.total:
@@ -218,6 +239,7 @@ class GameState:
         else:
             winner = "Tie"
 
+        # Apply payout, consume one allowed bet, and update run statistics.
         payout = self.calculate_payout(self.selected_bet, winner, self.bet, player_pair, banker_pair)
         self.chips += payout
         self.bets_remaining = int(self.bets_remaining) - 1
@@ -230,6 +252,7 @@ class GameState:
         self.history.insert(0, f"L{self.level} {self.selected_bet} ${self.bet}: {winner} ({payout:+})")
         self.history = self.history[:8]
 
+        # Decide what happens after the round: next level, victory, loss, or continue.
         if self.chips >= self.target:
             if self.level >= MAX_LEVEL:
                 self.run_cleared = True
@@ -259,6 +282,7 @@ class GameState:
         return result
 
     def to_dict(self) -> Dict:
+        # Convert the run into JSON-safe values for save files.
         return {
             "chips": self.chips,
             "level": self.level,
@@ -276,6 +300,7 @@ class GameState:
 
     @classmethod
     def from_dict(cls, data: Dict) -> "GameState":
+        # Recreate a GameState from saved JSON data, then reapply item effects.
         game = cls(
             chips=int(data.get("chips", 100)),
             level=int(data.get("level", 1)),

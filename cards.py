@@ -23,6 +23,8 @@ def recursive_card_value_sum(cards: List["Card"], index: int = 0) -> int:
 
 @dataclass
 class Card:
+    """Single playing card with Baccarat-specific point value."""
+
     rank: str
     suit: str
 
@@ -40,6 +42,8 @@ class Card:
 
 
 class Shoe:
+    """A multi-deck Baccarat shoe that can shuffle and deal cards."""
+
     def __init__(self, decks: int = 6):
         self.decks = decks
         self.cards: List[Card] = []
@@ -58,6 +62,8 @@ class Shoe:
 
 @dataclass
 class Hand:
+    """Cards held by Player or Banker during one round."""
+
     cards: List[Card] = field(default_factory=list)
 
     def add(self, card: Card) -> None:

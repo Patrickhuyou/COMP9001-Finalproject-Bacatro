@@ -19,11 +19,14 @@ def payout_modifier(multiplier: float) -> Callable:
 
 
 class Item:
+    """Base class for all evolution cards."""
+
     name = "Item"
     description = "No effect."
     rarity = "Common"
 
     def apply(self, game: "GameState") -> None:
+        # Subclasses override this to change fields or methods on GameState.
         pass
 
 
@@ -33,6 +36,7 @@ class NoCommission(Item):
     rarity = "Rare"
 
     def apply(self, game: "GameState") -> None:
+        # Removes the normal Banker commission.
         game.no_commission = True
 
 
@@ -42,6 +46,7 @@ class TieBooster(Item):
     rarity = "Common"
 
     def apply(self, game: "GameState") -> None:
+        # Raises only the Tie payout multiplier.
         game.tie_multiplier = 10
 
 
@@ -63,6 +68,7 @@ class ScoutLens(Item):
     rarity = "Common"
 
     def apply(self, game: "GameState") -> None:
+        # Enables a small hint message before a round is dealt.
         game.has_scout_lens = True
 
 
@@ -72,6 +78,7 @@ class CautiousCharm(Item):
     rarity = "Rare"
 
     def apply(self, game: "GameState") -> None:
+        # Replaces one rule method to show that items can alter game mechanics.
         game.rules.player_should_draw = lambda total: total <= 4
 
 
@@ -153,6 +160,7 @@ ITEM_POOL: List[Type[Item]] = [
     FinalReserve,
 ]
 
+# These weights drive the random evolution offering system.
 RARITY_WEIGHTS: Dict[str, int] = {
     "Common": 60,
     "Rare": 28,

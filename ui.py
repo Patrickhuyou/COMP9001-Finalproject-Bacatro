@@ -48,6 +48,8 @@ LOGO_FILE = Path("assets/bacatro-logo.png")
 
 
 class Button:
+    """Reusable clickable UI element built from a pygame.Rect and callback."""
+
     def __init__(self, rect: pygame.Rect, label: str, action: Callable):
         self.rect = rect
         self.label = label
@@ -72,7 +74,10 @@ class Button:
 
 
 class BacatroApp:
+    """Main Pygame application controller for screens, input, and drawing."""
+
     def __init__(self):
+        # Pygame setup: create the window, clock, fonts, and starting game state.
         pygame.init()
         pygame.display.set_caption("Bacatro")
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -95,10 +100,12 @@ class BacatroApp:
         self.set_screen_state("home")
 
     def set_screen_state(self, state: str) -> None:
+        # Every screen owns a different set of buttons, so refresh them together.
         self.screen_state = state
         self.refresh_buttons()
 
     def refresh_buttons(self) -> None:
+        # Screen-state dispatch keeps button layout out of the event loop.
         if self.screen_state == "home":
             self.build_home_buttons()
         elif self.screen_state == "playing":
@@ -117,6 +124,7 @@ class BacatroApp:
             self.buttons = []
 
     def save_to_slot(self, slot: int) -> None:
+        # UI calls storage through GameState.to_dict(), so files stay JSON-safe.
         try:
             DEFAULT_STORAGE.save_game(self.game.to_dict(), slot=slot)
             self.game.message = f"Game saved to slot {slot + 1}."
@@ -126,6 +134,7 @@ class BacatroApp:
             self.set_screen_state("playing")
 
     def load_from_slot(self, slot: int) -> None:
+        # After loading, choose the correct screen based on the saved run state.
         try:
             data = DEFAULT_STORAGE.load_game(slot=slot)
             self.game = GameState.from_dict(data)
@@ -149,10 +158,12 @@ class BacatroApp:
         self.set_screen_state("save_game")
 
     def open_rules_screen(self) -> None:
+        # Start the rules page at the top each time it opens.
         self.rules_scroll = 0
         self.set_screen_state("rules")
 
     def scroll_rules(self, amount: int) -> None:
+        # Clamp prevents the scroll position from moving beyond the content.
         self.rules_scroll = clamp(self.rules_scroll + amount, 0, self.rules_scroll_max)
 
     def return_from_slot_screen(self) -> None:
@@ -257,6 +268,7 @@ class BacatroApp:
         self.draw_centered_text(suit, (rect.centerx, rect.y + 90), self.small_font, color)
 
     def draw_card(self, card: Card, x: int, y: int) -> None:
+        # This custom renderer draws ranks, suits, pips, and face cards manually.
         rect = pygame.Rect(x, y, 74, 104)
         shadow = rect.move(3, 4)
         pygame.draw.rect(self.screen, CARD_SHADOW, shadow, border_radius=8)
@@ -306,6 +318,7 @@ class BacatroApp:
             self.draw_card(card, x + index * 88, y + 48)
 
     def build_play_buttons(self) -> None:
+        # Buttons store callbacks, so the click handler can stay generic.
         self.buttons = [
             Button(pygame.Rect(56, 606, 82, 44), "Player", lambda: self.set_side("Player")),
             Button(pygame.Rect(146, 606, 82, 44), "Banker", lambda: self.set_side("Banker")),
@@ -381,6 +394,7 @@ class BacatroApp:
         self.game.bet = clamp(self.game.bet + delta, 1, max_bet)
 
     def deal(self) -> None:
+        # The UI starts a round, while GameState performs the actual game logic.
         if self.game.shop_choices:
             self.game.message = "Choose an item first."
             return
@@ -394,6 +408,7 @@ class BacatroApp:
             self.game.message = str(exc)
 
     def choose_shop_item(self, pos: Tuple[int, int]) -> bool:
+        # Evolution cards are not normal buttons because they are large cards.
         if not self.game.shop_choices:
             return False
         for index, item in enumerate(self.game.shop_choices):
@@ -404,6 +419,7 @@ class BacatroApp:
         return False
 
     def handle_key(self, key: int) -> None:
+        # Keyboard behavior depends on the current screen state.
         if self.screen_state == "home":
             if key in {pygame.K_RETURN, pygame.K_SPACE}:
                 self.start_new_run()
@@ -648,6 +664,7 @@ class BacatroApp:
         self.draw_centered_text("Enter Start   L Load   R Rules   Esc Quit", (WIDTH // 2, 648), self.small_font, MUTED)
 
     def draw_rules(self) -> None:
+        # Rules uses a scrollable clipped viewport so the text can stay readable.
         self.screen.fill(BG)
         pygame.draw.rect(self.screen, FELT, pygame.Rect(28, 28, 1044, 664), border_radius=18)
         pygame.draw.rect(self.screen, (17, 35, 31), pygame.Rect(28, 28, 1044, 664), width=4, border_radius=18)
@@ -758,6 +775,7 @@ class BacatroApp:
 
         self.screen.set_clip(old_clip)
 
+        # Calculate scrollbar size from the content height drawn above.
         content_bottom = max(left_y, right_y) + self.rules_scroll + 24
         self.rules_scroll_max = max(0, content_bottom - viewport.bottom)
         if self.rules_scroll > self.rules_scroll_max:
@@ -870,6 +888,7 @@ class BacatroApp:
         self.draw_slot_screen("Save Game", "Choose a slot to save this run", saving=True)
 
     def draw(self) -> None:
+        # Top-level render dispatcher: draw the current screen and return early.
         if self.screen_state == "home":
             self.draw_home()
             pygame.display.flip()
@@ -961,6 +980,7 @@ class BacatroApp:
         pygame.display.flip()
 
     def run(self) -> None:
+        # Main game loop: read events, update state through handlers, then draw.
         while self.running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
